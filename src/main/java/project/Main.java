@@ -9,9 +9,11 @@ import org.jfree.data.category.DefaultCategoryDataset;
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.Arrays;
 
 /**
  * Created by pilipenko on 27.10.2017.
@@ -36,8 +38,6 @@ public class Main extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
 
         init();
-
-
     }
 
     private void init() {
@@ -83,7 +83,8 @@ public class Main extends JFrame {
                 {"Ranjan", "M.SC.", "Biology"},
                 {"Radha", "BCA", "Computer"}};
         String col[] = {"Name", "Course", "Subject"};
-        DefaultTableModel model = new DefaultTableModel(data, col);
+        TableModel model = new RowCoulumnTableModel(k, j);
+        //DefaultTableModel
 
         table1.setModel(model);
         table1.updateUI();
@@ -114,10 +115,6 @@ public class Main extends JFrame {
         dataset.addValue(240, "schools", "2010");
         dataset.addValue(300, "schools", "2014");
         return dataset;
-    }
-
-    public static void main(String[] args) {
-        new Main();
     }
 
     {
@@ -180,4 +177,50 @@ public class Main extends JFrame {
     public JComponent $$$getRootComponent$$$() {
         return rootPanel;
     }
+
+    public class RowCoulumnTableModel extends AbstractTableModel {
+
+        private int mRowCount;
+        private int mColumnCount;
+
+        private double[][] values;
+
+        public RowCoulumnTableModel(int mRowCount, int mColumnCount) {
+            this.mRowCount = mRowCount;
+            this.mColumnCount = mColumnCount;
+            values = new double[mRowCount][mColumnCount];
+
+            for (double[] row : values)
+                Arrays.fill(row, -1.0);
+        }
+
+        public int getRowCount() {
+            return mRowCount;
+        }
+
+        public int getColumnCount() {
+            return mColumnCount;
+        }
+
+        public Object getValueAt(int rowIndex, int columnIndex) {
+            double value = values[rowIndex][columnIndex];
+            return value == -1 ? "" : value;
+        }
+
+        @Override
+        public boolean isCellEditable(int rowIndex, int columnIndex) {
+            return true;
+        }
+
+        @Override
+        public void setValueAt(Object value, int row, int col) {
+            values[row][col] = Double.valueOf((String) value);
+            fireTableCellUpdated(row, col);
+        }
+    }
+
+    public static void main(String[] args) {
+        new Main();
+    }
+
 }
