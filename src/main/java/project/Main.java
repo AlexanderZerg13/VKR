@@ -27,7 +27,7 @@ public class Main extends JFrame {
     private JScrollPane mParryScrollPane;
     private JTextField mParryProbabilityTextField;
 
-    private static int TIME_RANGE = 10;
+    private static int TIME_RANGE = 100;
     private static int TIME_DELTA = 1;
 
     public Main() {
@@ -87,7 +87,7 @@ public class Main extends JFrame {
 
                 System.out.printf("%f %f %f %f %n", executor.getProbabilityS2(1), executor.getProbabilityS2(2), executor.getProbabilityS2(4), executor.getProbabilityS2(6));
 
-                //prepareTables(countThreatInt, countStepsInt);
+                prepareTables(executor);
 
             } catch (NumberFormatException exception) {
                 exception.printStackTrace();
@@ -143,36 +143,35 @@ public class Main extends JFrame {
 
     }
 
-    private void prepareTables(int treats, int steps) {
+    private void prepareTables(Executor executor) {
+        int rows = TIME_RANGE / TIME_DELTA;
+        int columns = 5;
 
-        RowColumnTableModel model1 = new RowColumnTableModel(treats + 2, treats + 2, (column, size) -> "P" + column, (column, size) -> "P" + column);
-        if (treats == 3) {
-            model1.setValues(
-                    new double[][]{
-                            {0.7, 0.15, 0.05, 0.1, 0},
-                            {0.7, 0, 0.04, 0.06, 0.2},
-                            {0.6, 0.05, 0, 0.1, 0.25},
-                            {0.65, 0.03, 0.02, 0, 0.3},
-                            {0, 0, 0, 0, 1}}
-            );
+        double[][] B = new double[rows][columns];
+        for (int i = 0; i < rows; i += TIME_DELTA) {
+            B[i][0] = executor.getProbabilityS0(i);
+            B[i][1] = executor.getProbabilityS1(i);
+            B[i][2] = executor.getProbabilityS2(i);
+
+            B[i][3] = B[i][0] +  B[i][1];
+            B[i][4] = B[i][2];
         }
-/*
-        table1.setModel(model1);
-        table1.updateUI();*/
 
-        RowColumnTableModel model2 = new RowColumnTableModel(steps, treats + 4,
+        RowColumnTableModel model2 = new RowColumnTableModel(rows, columns,
                 (column, size) -> {
                     if (column == size) {
-                        return "Qби(i)";
+                        return "Qби(t)";
                     }
                     if (column == size - 1) {
-                        return "Pби(i)";
+                        return "Pби(t)";
                     }
-                    return "P" + column + "(i)";
+                    return "P" + column + "(t)";
                 },
-                (column, size) -> "i=" + (column + 1));
+                (column, size) -> "t=" + (column + 1));
         mParryTable.setModel(model2);
         mParryTable.updateUI();
+
+        ((RowColumnTableModel) mParryTable.getModel()).setValues(B);
     }
 
     private void initChart(double[] propability) {

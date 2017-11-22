@@ -58,7 +58,7 @@ public class RowColumnTableModel extends AbstractTableModel {
         if (columnIndex == 0) {
             return false;
         }
-        return true;
+        return false;
     }
 
     @Override
