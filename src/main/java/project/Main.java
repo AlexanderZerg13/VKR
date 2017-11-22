@@ -17,16 +17,18 @@ import java.awt.*;
  */
 public class Main extends JFrame {
     private JPanel rootPanel;
-    private JTextField textField1;
-    private JTextField textField2;
+    private JTextField mIntensityTreatFlowTextField;
+    private JTextField mIntensityParryTextField;
     private JButton mEnterButton;
     private JButton mCountProbabilityButton;
-    private JTable table1;
-    private JTable table2;
+    private JTable mParryTable;
     private JButton buildChartsButton;
     private JPanel mChartPanel;
-    private JScrollPane mJScrollPane1;
-    private JScrollPane mJScrollPane2;
+    private JScrollPane mParryScrollPane;
+    private JTextField mParryProbabilityTextField;
+
+    private static int TIME_RANGE = 10;
+    private static int TIME_DELTA = 1;
 
     public Main() {
         setContentPane(rootPanel);
@@ -46,20 +48,7 @@ public class Main extends JFrame {
     }
 
     private void createTables() {
-        table1 = new JTable() {
-            @Override
-            public Component prepareRenderer(
-                    TableCellRenderer renderer, int row, int col) {
-                if (col == 0) {
-                    return this.getTableHeader().getDefaultRenderer()
-                            .getTableCellRendererComponent(this, this.getValueAt(
-                                    row, col), false, false, row, col);
-                } else {
-                    return super.prepareRenderer(renderer, row, col);
-                }
-            }
-        };
-        table2 = new JTable() {
+        mParryTable = new JTable() {
             @Override
             public Component prepareRenderer(
                     TableCellRenderer renderer, int row, int col) {
@@ -73,41 +62,43 @@ public class Main extends JFrame {
             }
         };
 
-        final JTableHeader header1 = table1.getTableHeader();
-        header1.setDefaultRenderer(new HeaderRenderer(table1));
-        mJScrollPane1.getViewport().add(table1);
-
-        final JTableHeader header2 = table2.getTableHeader();
-        header2.setDefaultRenderer(new HeaderRenderer(table2));
-        mJScrollPane2.getViewport().add(table2);
+        final JTableHeader header1 = mParryTable.getTableHeader();
+        header1.setDefaultRenderer(new HeaderRenderer(mParryTable));
+        mParryScrollPane.getViewport().add(mParryTable);
     }
 
     private void initButtons() {
-
         mEnterButton.addActionListener(e -> {
-            String countThreatString = textField1.getText();
-            String countStepsString = textField2.getText();
+            String intensityTreatFlowString = mIntensityTreatFlowTextField.getText();
+            String intensityParryString = mIntensityParryTextField.getText();
+            String parryProbabilityString = mParryProbabilityTextField.getText();
 
             try {
-                int countThreatInt = Integer.parseInt(countThreatString);
-                int countStepsInt = Integer.parseInt(countStepsString);
+                int intensityTreatFlow = Integer.parseInt(intensityTreatFlowString);
+                int intensityParry = Integer.parseInt(intensityParryString);
+                double parryProbability = Double.parseDouble(parryProbabilityString);
 
-                if (countThreatInt < 1 || countStepsInt < 1) {
+                if (parryProbability < 0.0 || parryProbability > 1.0) {
                     throw new NumberFormatException();
                 }
 
-                prepareTables(countThreatInt, countStepsInt);
+                Executor executor = new Executor(intensityTreatFlow, intensityParry, parryProbability);
+                executor.init();
+
+                System.out.printf("%f %f %f %f %n", executor.getProbabilityS2(1), executor.getProbabilityS2(2), executor.getProbabilityS2(4), executor.getProbabilityS2(6));
+
+                //prepareTables(countThreatInt, countStepsInt);
 
             } catch (NumberFormatException exception) {
-
+                exception.printStackTrace();
             }
         });
 
         mCountProbabilityButton.addActionListener(e -> {
-            double[][] A = ((RowColumnTableModel) table1.getModel()).getValues();
+            double[][] A = new double[][]{{1, 1}};//= ((RowColumnTableModel) table1.getModel()).getValues();
 
-            int rows = table2.getModel().getRowCount();
-            int cols = table2.getModel().getColumnCount() - 1;
+            int rows = mParryTable.getModel().getRowCount();
+            int cols = mParryTable.getModel().getColumnCount() - 1;
             double[][] B = new double[rows][cols];
 
             for (int i = 0; i < rows; i++) {
@@ -136,12 +127,12 @@ public class Main extends JFrame {
                 }
             }
 
-            ((RowColumnTableModel) table2.getModel()).setValues(B);
+            ((RowColumnTableModel) mParryTable.getModel()).setValues(B);
         });
 
         buildChartsButton.addActionListener(e -> {
-            int threatCount = table2.getModel().getRowCount();
-            double[][] values = ((RowColumnTableModel) table2.getModel()).getValues();
+            int threatCount = mParryTable.getModel().getRowCount();
+            double[][] values = ((RowColumnTableModel) mParryTable.getModel()).getValues();
             double[] probability = new double[threatCount];
             for (int i = 0; i < probability.length; i++) {
                 probability[i] = values[i][values[i].length - 2];
@@ -165,9 +156,9 @@ public class Main extends JFrame {
                             {0, 0, 0, 0, 1}}
             );
         }
-
+/*
         table1.setModel(model1);
-        table1.updateUI();
+        table1.updateUI();*/
 
         RowColumnTableModel model2 = new RowColumnTableModel(steps, treats + 4,
                 (column, size) -> {
@@ -180,8 +171,8 @@ public class Main extends JFrame {
                     return "P" + column + "(i)";
                 },
                 (column, size) -> "i=" + (column + 1));
-        table2.setModel(model2);
-        table2.updateUI();
+        mParryTable.setModel(model2);
+        mParryTable.updateUI();
     }
 
     private void initChart(double[] propability) {
@@ -233,42 +224,42 @@ public class Main extends JFrame {
      */
     private void $$$setupUI$$$() {
         rootPanel = new JPanel();
-        rootPanel.setLayout(new com.intellij.uiDesigner.core.GridLayoutManager(5, 7, new Insets(10, 10, 10, 10), -1, -1));
+        rootPanel.setLayout(new com.intellij.uiDesigner.core.GridLayoutManager(7, 5, new Insets(10, 10, 10, 10), -1, -1));
         final JLabel label1 = new JLabel();
-        label1.setText("Количество угроз:");
+        label1.setText("Интенсивность потока угроз (λ):");
         rootPanel.add(label1, new com.intellij.uiDesigner.core.GridConstraints(0, 0, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_NONE, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
-        textField1 = new JTextField();
-        textField1.setText("");
-        rootPanel.add(textField1, new com.intellij.uiDesigner.core.GridConstraints(0, 1, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(50, 24), null, 0, false));
-        final JLabel label2 = new JLabel();
-        label2.setText("Шагов:");
-        rootPanel.add(label2, new com.intellij.uiDesigner.core.GridConstraints(0, 2, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_NONE, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
-        textField2 = new JTextField();
-        rootPanel.add(textField2, new com.intellij.uiDesigner.core.GridConstraints(0, 3, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(50, 24), null, 0, false));
+        mIntensityTreatFlowTextField = new JTextField();
+        mIntensityTreatFlowTextField.setText("");
+        rootPanel.add(mIntensityTreatFlowTextField, new com.intellij.uiDesigner.core.GridConstraints(0, 1, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(50, 24), null, 0, false));
         mEnterButton = new JButton();
         mEnterButton.setText("Ввод");
-        rootPanel.add(mEnterButton, new com.intellij.uiDesigner.core.GridConstraints(0, 4, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        rootPanel.add(mEnterButton, new com.intellij.uiDesigner.core.GridConstraints(0, 2, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         mCountProbabilityButton = new JButton();
         mCountProbabilityButton.setText("Рассчитать вероятности");
-        rootPanel.add(mCountProbabilityButton, new com.intellij.uiDesigner.core.GridConstraints(0, 6, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        rootPanel.add(mCountProbabilityButton, new com.intellij.uiDesigner.core.GridConstraints(0, 4, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         final com.intellij.uiDesigner.core.Spacer spacer1 = new com.intellij.uiDesigner.core.Spacer();
-        rootPanel.add(spacer1, new com.intellij.uiDesigner.core.GridConstraints(0, 5, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_WANT_GROW, 1, null, null, null, 0, false));
-        final JPanel panel1 = new JPanel();
-        panel1.setLayout(new com.intellij.uiDesigner.core.GridLayoutManager(1, 2, new Insets(0, 0, 0, 0), -1, -1));
-        rootPanel.add(panel1, new com.intellij.uiDesigner.core.GridConstraints(1, 0, 1, 7, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_BOTH, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_SHRINK | com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_GROW, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_SHRINK | com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_GROW, null, null, null, 0, false));
-        mJScrollPane1 = new JScrollPane();
-        panel1.add(mJScrollPane1, new com.intellij.uiDesigner.core.GridConstraints(0, 0, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_BOTH, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_SHRINK | com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_WANT_GROW, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_SHRINK | com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
-        mJScrollPane2 = new JScrollPane();
-        panel1.add(mJScrollPane2, new com.intellij.uiDesigner.core.GridConstraints(0, 1, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_BOTH, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_SHRINK | com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_WANT_GROW, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_SHRINK | com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        rootPanel.add(spacer1, new com.intellij.uiDesigner.core.GridConstraints(0, 3, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_WANT_GROW, 1, null, null, null, 0, false));
         buildChartsButton = new JButton();
         buildChartsButton.setText("Построить график зависимости");
-        rootPanel.add(buildChartsButton, new com.intellij.uiDesigner.core.GridConstraints(3, 6, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(50, -1), null, 0, false));
-        final JLabel label3 = new JLabel();
-        label3.setText("График зависимости вероятности благополочного исхода Рби от количества шагов моделирования");
-        rootPanel.add(label3, new com.intellij.uiDesigner.core.GridConstraints(2, 0, 1, 7, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_NONE, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        rootPanel.add(buildChartsButton, new com.intellij.uiDesigner.core.GridConstraints(5, 4, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(50, -1), null, 0, false));
+        final JLabel label2 = new JLabel();
+        label2.setText("График зависимости вероятности благополочного исхода Рби от количества шагов моделирования");
+        rootPanel.add(label2, new com.intellij.uiDesigner.core.GridConstraints(4, 0, 1, 5, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_NONE, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         mChartPanel = new JPanel();
         mChartPanel.setLayout(new BorderLayout(0, 0));
-        rootPanel.add(mChartPanel, new com.intellij.uiDesigner.core.GridConstraints(4, 0, 1, 7, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_BOTH, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_SHRINK | com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_GROW, 1, new Dimension(-1, 200), null, new Dimension(-1, 400), 0, false));
+        rootPanel.add(mChartPanel, new com.intellij.uiDesigner.core.GridConstraints(6, 0, 1, 5, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_BOTH, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_SHRINK | com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_GROW, 1, new Dimension(-1, 200), null, new Dimension(-1, 400), 0, false));
+        final JLabel label3 = new JLabel();
+        label3.setText("Интенсивность парирования (μ):");
+        rootPanel.add(label3, new com.intellij.uiDesigner.core.GridConstraints(1, 0, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_NONE, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        mIntensityParryTextField = new JTextField();
+        rootPanel.add(mIntensityParryTextField, new com.intellij.uiDesigner.core.GridConstraints(1, 1, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(50, 24), null, 0, false));
+        final JLabel label4 = new JLabel();
+        label4.setText("Вероятность парирования (R):");
+        rootPanel.add(label4, new com.intellij.uiDesigner.core.GridConstraints(2, 0, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_NONE, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        mParryProbabilityTextField = new JTextField();
+        rootPanel.add(mParryProbabilityTextField, new com.intellij.uiDesigner.core.GridConstraints(2, 1, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_WANT_GROW, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(150, -1), null, 0, false));
+        mParryScrollPane = new JScrollPane();
+        rootPanel.add(mParryScrollPane, new com.intellij.uiDesigner.core.GridConstraints(3, 0, 1, 5, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_BOTH, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_SHRINK | com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_WANT_GROW, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_SHRINK | com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
     }
 
     /**
