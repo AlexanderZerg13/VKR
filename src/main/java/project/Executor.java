@@ -5,8 +5,8 @@ package project;
  */
 public class Executor {
 
-    private int mIntensityTreatFlow;
-    private int mIntensityParry;
+    private double mIntensityTreatFlow;
+    private double mIntensityParry;
     private double mParryProbability;
 
     private double s1;
@@ -16,7 +16,7 @@ public class Executor {
     private double A1, B1;
     private double A2, B2, C2;
 
-    public Executor(int intensityTreatFlow, int intensityParry, double parryProbability) {
+    public Executor(double intensityTreatFlow, double intensityParry, double parryProbability) {
         mIntensityTreatFlow = intensityTreatFlow;
         mIntensityParry = intensityParry;
         mParryProbability = parryProbability;
@@ -50,11 +50,42 @@ public class Executor {
         return A0 * Math.exp(s1 * t) + B0 * Math.exp(s2 * t);
     }
 
+    public double getProbability2S0(double t) {
+        double L = mIntensityTreatFlow * mIntensityTreatFlow + mIntensityParry * mIntensityParry + 2 * mIntensityParry * mIntensityTreatFlow * (2 * mParryProbability - 1);
+
+
+        double ret = (1 / (2 * Math.sqrt(L))) *
+                Math.exp(- (Math.sqrt(L) * t) / 2) *
+                (Math.exp(t * Math.sqrt(L)) * (Math.sqrt(L) - mIntensityTreatFlow + mIntensityParry) + (Math.sqrt(L) + mIntensityTreatFlow - mIntensityParry));
+
+        return ret;
+    }
+
     public double getProbabilityS1(double t) {
         return A1 * Math.exp(s1 * t) + B1 * Math.exp(s2 * t);
     }
 
+    public double getProbability2S1(double t) {
+        double L = mIntensityParry * mIntensityParry + mIntensityTreatFlow * mIntensityTreatFlow + 2 * mIntensityParry * mIntensityTreatFlow * (1 - 2 * (1 - mParryProbability));
+        double c1 = mIntensityParry + mIntensityTreatFlow;
+        double c0 = mIntensityParry * mIntensityTreatFlow * (1 - mParryProbability);
+        double eL1 = Math.exp(((Math.sqrt(L) * t) / 2));
+        double eL2 = Math.exp(-((Math.sqrt(L) * t) / 2));
+
+        double ret =  (mIntensityTreatFlow / Math.sqrt(L)) * Math.exp(-((c1 * t) / 2)) * (eL1 - eL2);
+        return Math.abs(ret);
+    }
+
     public double getProbabilityS2(double t) {
         return A2 + B2 * Math.exp(s1 * t) + C2 * Math.exp(s2 * t);
+    }
+
+    public double getProbability2S2(double t) {
+        double L = mIntensityParry * mIntensityParry + mIntensityTreatFlow * mIntensityTreatFlow + 2 * mIntensityParry * mIntensityTreatFlow * (1 - 2 * (1 - mParryProbability));
+        double c1 = mIntensityParry + mIntensityTreatFlow;
+        double c0 = mIntensityParry * mIntensityTreatFlow * (1 - mParryProbability);
+        double eL = Math.exp(-((Math.sqrt(L) * t) / 2));
+
+        return 1 - getProbability2S1(t) - getProbability2S0(t);
     }
 }

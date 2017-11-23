@@ -11,6 +11,7 @@ import org.jfree.data.xy.XYSeriesCollection;
 import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
+import java.util.Formatter;
 
 /**
  * Created by pilipenko on 27.10.2017.
@@ -26,9 +27,12 @@ public class Main extends JFrame {
     private JPanel mChartPanel;
     private JScrollPane mParryScrollPane;
     private JTextField mParryProbabilityTextField;
+    private JButton mClearButton;
 
-    private static int TIME_RANGE = 100;
+    private static int TIME_RANGE = 50;
     private static int TIME_DELTA = 1;
+
+    private XYSeriesCollection mXySeriesCollection;
 
     public Main() {
         setContentPane(rootPanel);
@@ -42,6 +46,8 @@ public class Main extends JFrame {
     }
 
     private void init() {
+        mXySeriesCollection = new XYSeriesCollection();
+
         createTables();
         initButtons();
         //initChart();
@@ -74,8 +80,8 @@ public class Main extends JFrame {
             String parryProbabilityString = mParryProbabilityTextField.getText();
 
             try {
-                int intensityTreatFlow = Integer.parseInt(intensityTreatFlowString);
-                int intensityParry = Integer.parseInt(intensityParryString);
+                double intensityTreatFlow = Double.parseDouble(intensityTreatFlowString);
+                double intensityParry = Double.parseDouble(intensityParryString);
                 double parryProbability = Double.parseDouble(parryProbabilityString);
 
                 if (parryProbability < 0.0 || parryProbability > 1.0) {
@@ -87,63 +93,26 @@ public class Main extends JFrame {
 
                 System.out.printf("%f %f %f %f %n", executor.getProbabilityS2(1), executor.getProbabilityS2(2), executor.getProbabilityS2(4), executor.getProbabilityS2(6));
 
-                prepareTables(executor);
+                double[][] B = prepareTables(executor);
 
+                double[] probability = new double[B.length];
+                for (int i = 0; i < B.length; i++) {
+                    probability[i] = B[i][3];
+                }
+
+                addSeries(probability, intensityTreatFlow, intensityParry, parryProbability);
+                initChart();
             } catch (NumberFormatException exception) {
                 exception.printStackTrace();
             }
         });
 
-        mCountProbabilityButton.addActionListener(e -> {
-            double[][] A = new double[][]{{1, 1}};//= ((RowColumnTableModel) table1.getModel()).getValues();
-
-            int rows = mParryTable.getModel().getRowCount();
-            int cols = mParryTable.getModel().getColumnCount() - 1;
-            double[][] B = new double[rows][cols];
-
-            for (int i = 0; i < rows; i++) {
-                if (i == 0) {
-                    for (int j = 0; j < cols - 2; j++) {
-                        B[i][j] = A[0][j];
-                    }
-                    B[i][cols - 2] = 1;
-                    B[i][cols - 1] = 0;
-                } else {
-                    for (int j = 0; j < cols - 2; j++) {
-                        double ver = 0;
-                        if (j < cols - 4) {
-                            for (int q = 0; q < cols - 3; q++) {
-                                ver += B[i - 1][q] * A[q][j];
-                            }
-                        } else {
-                            for (int q = 0; q < cols - 2; q++) {
-                                ver += B[i - 1][q] * A[q][j];
-                            }
-                        }
-                        B[i][j] = ver;
-                    }
-                    B[i][cols - 2] = 1 - B[i][cols - 3];
-                    B[i][cols - 1] = B[i][cols - 3];
-                }
-            }
-
-            ((RowColumnTableModel) mParryTable.getModel()).setValues(B);
+        mClearButton.addActionListener(e -> {
+            clearSeriesCollection();
         });
-
-        buildChartsButton.addActionListener(e -> {
-            int threatCount = mParryTable.getModel().getRowCount();
-            double[][] values = ((RowColumnTableModel) mParryTable.getModel()).getValues();
-            double[] probability = new double[threatCount];
-            for (int i = 0; i < probability.length; i++) {
-                probability[i] = values[i][values[i].length - 2];
-            }
-
-            initChart(probability);
-        });
-
     }
 
-    private void prepareTables(Executor executor) {
+    private double[][] prepareTables(Executor executor) {
         int rows = TIME_RANGE / TIME_DELTA;
         int columns = 5;
 
@@ -153,7 +122,11 @@ public class Main extends JFrame {
             B[i][1] = executor.getProbabilityS1(i);
             B[i][2] = executor.getProbabilityS2(i);
 
-            B[i][3] = B[i][0] +  B[i][1];
+            //System.out.printf("S0: %f =? %f %n", executor.getProbabilityS0(i), executor.getProbability2S0(i));
+            //System.out.printf("S1: %f =? %f %n", executor.getProbabilityS1(i), executor.getProbability2S1(i));
+            //System.out.printf("S2: %f =? %f %n", executor.getProbabilityS2(i), executor.getProbability2S2(i));
+
+            B[i][3] = /*B[i][0];*/ +B[i][2];
             B[i][4] = B[i][2];
         }
 
@@ -172,14 +145,16 @@ public class Main extends JFrame {
         mParryTable.updateUI();
 
         ((RowColumnTableModel) mParryTable.getModel()).setValues(B);
+
+        return B;
     }
 
-    private void initChart(double[] propability) {
+    private void initChart() {
         JFreeChart xylineChart = ChartFactory.createXYLineChart(
                 "Результат моделирования",
-                "K, кол-во шагов",
-                "Pби",
-                createDataSet(propability),
+                "t",
+                "Pби(t)",
+                mXySeriesCollection,
                 PlotOrientation.VERTICAL,
                 true, true, false
         );
@@ -191,16 +166,18 @@ public class Main extends JFrame {
         rootPanel.validate();
     }
 
-    private XYDataset createDataSet(double[] propability) {
-        final XYSeries series1 = new XYSeries("");
+    private void addSeries(double[] propability, double intensityTreatFlow, double intensityParry, double parryProbability) {
+        final XYSeries series1 = new XYSeries(new Formatter().format("λ = %f; μ = %f; R = %f", intensityTreatFlow, intensityParry, parryProbability).toString());
         for (int i = 0; i < propability.length; i++) {
             series1.add(i + 1, propability[i]);
         }
 
-        final XYSeriesCollection dataset = new XYSeriesCollection();
-        dataset.addSeries(series1);
+        mXySeriesCollection.addSeries(series1);
+    }
 
-        return dataset;
+    private void clearSeriesCollection() {
+        mXySeriesCollection = new XYSeriesCollection();
+        initChart();
     }
 
     public static void main(String[] args) {
@@ -223,7 +200,7 @@ public class Main extends JFrame {
      */
     private void $$$setupUI$$$() {
         rootPanel = new JPanel();
-        rootPanel.setLayout(new com.intellij.uiDesigner.core.GridLayoutManager(7, 5, new Insets(10, 10, 10, 10), -1, -1));
+        rootPanel.setLayout(new com.intellij.uiDesigner.core.GridLayoutManager(5, 4, new Insets(10, 10, 10, 10), -1, -1));
         final JLabel label1 = new JLabel();
         label1.setText("Интенсивность потока угроз (λ):");
         rootPanel.add(label1, new com.intellij.uiDesigner.core.GridConstraints(0, 0, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_NONE, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
@@ -233,32 +210,26 @@ public class Main extends JFrame {
         mEnterButton = new JButton();
         mEnterButton.setText("Ввод");
         rootPanel.add(mEnterButton, new com.intellij.uiDesigner.core.GridConstraints(0, 2, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
-        mCountProbabilityButton = new JButton();
-        mCountProbabilityButton.setText("Рассчитать вероятности");
-        rootPanel.add(mCountProbabilityButton, new com.intellij.uiDesigner.core.GridConstraints(0, 4, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         final com.intellij.uiDesigner.core.Spacer spacer1 = new com.intellij.uiDesigner.core.Spacer();
         rootPanel.add(spacer1, new com.intellij.uiDesigner.core.GridConstraints(0, 3, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_WANT_GROW, 1, null, null, null, 0, false));
-        buildChartsButton = new JButton();
-        buildChartsButton.setText("Построить график зависимости");
-        rootPanel.add(buildChartsButton, new com.intellij.uiDesigner.core.GridConstraints(5, 4, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(50, -1), null, 0, false));
-        final JLabel label2 = new JLabel();
-        label2.setText("График зависимости вероятности благополочного исхода Рби от количества шагов моделирования");
-        rootPanel.add(label2, new com.intellij.uiDesigner.core.GridConstraints(4, 0, 1, 5, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_NONE, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         mChartPanel = new JPanel();
         mChartPanel.setLayout(new BorderLayout(0, 0));
-        rootPanel.add(mChartPanel, new com.intellij.uiDesigner.core.GridConstraints(6, 0, 1, 5, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_BOTH, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_SHRINK | com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_GROW, 1, new Dimension(-1, 200), null, new Dimension(-1, 400), 0, false));
-        final JLabel label3 = new JLabel();
-        label3.setText("Интенсивность парирования (μ):");
-        rootPanel.add(label3, new com.intellij.uiDesigner.core.GridConstraints(1, 0, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_NONE, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        rootPanel.add(mChartPanel, new com.intellij.uiDesigner.core.GridConstraints(4, 0, 1, 4, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_BOTH, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_SHRINK | com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_GROW, 1, new Dimension(-1, 200), null, new Dimension(-1, 400), 0, false));
+        final JLabel label2 = new JLabel();
+        label2.setText("Интенсивность парирования (μ):");
+        rootPanel.add(label2, new com.intellij.uiDesigner.core.GridConstraints(1, 0, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_NONE, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         mIntensityParryTextField = new JTextField();
         rootPanel.add(mIntensityParryTextField, new com.intellij.uiDesigner.core.GridConstraints(1, 1, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(50, 24), null, 0, false));
-        final JLabel label4 = new JLabel();
-        label4.setText("Вероятность парирования (R):");
-        rootPanel.add(label4, new com.intellij.uiDesigner.core.GridConstraints(2, 0, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_NONE, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        final JLabel label3 = new JLabel();
+        label3.setText("Вероятность парирования (R):");
+        rootPanel.add(label3, new com.intellij.uiDesigner.core.GridConstraints(2, 0, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_NONE, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         mParryProbabilityTextField = new JTextField();
         rootPanel.add(mParryProbabilityTextField, new com.intellij.uiDesigner.core.GridConstraints(2, 1, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_WEST, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_WANT_GROW, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(150, -1), null, 0, false));
         mParryScrollPane = new JScrollPane();
-        rootPanel.add(mParryScrollPane, new com.intellij.uiDesigner.core.GridConstraints(3, 0, 1, 5, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_BOTH, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_SHRINK | com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_WANT_GROW, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_SHRINK | com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        rootPanel.add(mParryScrollPane, new com.intellij.uiDesigner.core.GridConstraints(3, 0, 1, 4, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_BOTH, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_SHRINK | com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_WANT_GROW, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_SHRINK | com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        mClearButton = new JButton();
+        mClearButton.setText("Очистить");
+        rootPanel.add(mClearButton, new com.intellij.uiDesigner.core.GridConstraints(2, 2, 1, 1, com.intellij.uiDesigner.core.GridConstraints.ANCHOR_CENTER, com.intellij.uiDesigner.core.GridConstraints.FILL_HORIZONTAL, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_SHRINK | com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_CAN_GROW, com.intellij.uiDesigner.core.GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
     }
 
     /**
